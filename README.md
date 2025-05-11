@@ -44,3 +44,5 @@ This tool is ideal for artists, developers, and researchers interested in proced
 | Input: `neo.png` | Output: `result.png` |
 |------------------|----------------------|
 | ![Input](neo.png) | ![Output](result.png) |
+
+- Here you can see the example running on a [shadertoy](https://www.shadertoy.com/view/wXBSWD).

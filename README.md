@@ -31,3 +31,16 @@ This tool is ideal for artists, developers, and researchers interested in proced
    ```bash
    git clone https://github.com/yourusername/Image2Shadertoy.git
    cd Image2Shadertoy
+   
+### Usage
+- Run the example command to confirm it works:
+```bash
+     python Image2Shadertoy.py -i neo.png -n 32
+```
+- Check that `result.png` and `result.shadertoy` are generated correctly.
+- Upload `result.shadertoy` to [Shadertoy](https://www.shadertoy.com/new) to verify it renders `neo.png` accurately.
+
+### Example
+| Input: `neo.png` | Output: `result.png` |
+|------------------|----------------------|
+| ![Input](neo.png) | ![Output](result.png) |

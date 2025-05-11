@@ -6,12 +6,12 @@ from torchvision.transforms import ToTensor
 from torchvision.utils import save_image
 import torch.nn.functional as F
 import time
-from torch.cuda.amp import autocast
+from torch.amp import autocast  # Updated import
 import argparse
 
 # Parameters
 DEFAULT_NUM_GAUSSIANS_INITIAL = 110
-ITERATIONS = 2000
+DEFAULT_ITERATIONS = 2000
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEBUG_COLORS = False
 MIN_SIGMA = 1e-2
@@ -51,7 +51,8 @@ def compute_gaussian_contribution(params, width, height, device, min_dim, x_grid
     num_gaussians = params.shape[0]
     x = x_grid.expand(num_gaussians, -1, -1)
     y = y_grid.expand(num_gaussians, -1, -1)
-    with autocast():
+    # Use autocast only if CUDA is available
+    with autocast('cuda', enabled=device.type == 'cuda'):
         _, alpha = gaussian_2d(x, y, params, min_dim)
         max_alpha = torch.amax(alpha, dim=(1, 2))
     return max_alpha
@@ -120,7 +121,7 @@ def render_tile_batch(tile_batch, params, tile_gaussians, width, height, device,
 
         x = tile_x_grid.expand(num_gaussians, -1, -1)
         y = tile_y_grid.expand(num_gaussians, -1, -1)
-        with autocast():
+        with autocast('cuda', enabled=device.type == 'cuda'):
             rgb, alpha = gaussian_2d(x, y, tile_params, min_dim)
             rgb = rgb.expand(-1, tile_height, tile_width, -1)
             alpha = alpha.unsqueeze(-1)
@@ -147,7 +148,7 @@ def render_gaussians(gaussians, width, height, device, min_dim, x_grid, y_grid, 
         # Vectorized rendering for small Gaussian counts
         x = x_grid.expand(num_gaussians, -1, -1)
         y = y_grid.expand(num_gaussians, -1, -1)
-        with autocast():
+        with autocast('cuda', enabled=device.type == 'cuda'):
             rgb, alpha = gaussian_2d(x, y, params, min_dim)
             rgb = rgb.expand(-1, height, width, -1)
             alpha = alpha.unsqueeze(-1)
@@ -328,19 +329,25 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 def main():
     """Perform Gaussian splatting with error-based initialization."""
     parser = argparse.ArgumentParser(description="Gaussian splatting script with command-line arguments.")
-    parser.add_argument('-i', '--input', required=True, help="Path to input image (e.g., example_input.png)")
+    parser.add_argument('-i', '--input', required=True, help="Path to input image (e.g., neo.png)")
     parser.add_argument('-o', '--output', default='result.png', help="Path to output image (default: result.png)")
     parser.add_argument('-osh', '--output-shadertoy', default='result.shadertoy', help="Path to output Shadertoy file (default: result.shadertoy)")
     parser.add_argument('-n', '--num-gaussians', type=int, default=DEFAULT_NUM_GAUSSIANS_INITIAL, help=f"Number of initial Gaussians (default: {DEFAULT_NUM_GAUSSIANS_INITIAL})")
+    parser.add_argument('-it', '--iterations', type=int, default=DEFAULT_ITERATIONS, help=f"Number of initial iterations (default: {DEFAULT_ITERATIONS})")
     args = parser.parse_args()
 
     input_image_path = args.input
     output_image_path = args.output
     output_shadertoy_path = args.output_shadertoy
     num_gaussians_initial = args.num_gaussians
+    initial_iterations = args.iterations
 
     if num_gaussians_initial <= 0:
         print(f"Error: Number of initial Gaussians must be positive, got {num_gaussians_initial}")
+        return
+
+    if initial_iterations <= 0:
+        print(f"Error: Number of initial iterations must be positive, got {initial_iterations}")
         return
 
     torch.autograd.set_detect_anomaly(True)
@@ -352,6 +359,7 @@ def main():
         print("Warning: CUDA not available, running on CPU")
 
     print(f"Initial number of Gaussians: {num_gaussians_initial}")
+    print(f"Initial number of iterations: {initial_iterations}")
 
     if not os.path.exists(input_image_path):
         print(f"Error: Input image file {input_image_path} not found.")
@@ -373,10 +381,10 @@ def main():
     low_res_tensor = to_tensor(low_res_img).to(DEVICE) * 255
 
     stages = [
-        {"new_gaussians": num_gaussians_initial*1, "iterations": ITERATIONS, "sigma_range": (min_dim / 32, min_dim / 4)},
-        {"new_gaussians": num_gaussians_initial*2, "iterations": ITERATIONS+1000, "sigma_range": (min_dim / 64, min_dim / 16)},
-        {"new_gaussians": num_gaussians_initial*3, "iterations": ITERATIONS+2000, "sigma_range": (min_dim / 128, min_dim / 32)},
-        {"new_gaussians": num_gaussians_initial*4, "iterations": ITERATIONS+3000, "sigma_range": (4, min_dim / 64)}
+        {"new_gaussians": num_gaussians_initial*1, "iterations": initial_iterations, "sigma_range": (min_dim / 32, min_dim / 4)},
+        {"new_gaussians": num_gaussians_initial*2, "iterations": initial_iterations+1000, "sigma_range": (min_dim / 64, min_dim / 16)},
+        {"new_gaussians": num_gaussians_initial*3, "iterations": initial_iterations+2000, "sigma_range": (min_dim / 128, min_dim / 32)},
+        {"new_gaussians": num_gaussians_initial*4, "iterations": initial_iterations+3000, "sigma_range": (4, min_dim / 64)}
     ]
 
     total_iterations = sum(stage["iterations"] for stage in stages)
@@ -411,13 +419,13 @@ def main():
 
         lr = 0.1 if stage_idx == 0 else 0.01
         optimizer = torch.optim.AdamW([params], lr=lr, weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, min_lr=1e-6, verbose=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=100, min_lr=1e-6)  # Removed verbose=True
 
         for iter_idx in range(stage["iterations"]):
             start_iter = time.time()
             optimizer.zero_grad()
 
-            with autocast():
+            with autocast('cuda', enabled=DEVICE.type == 'cuda'):
                 rendered = render_gaussians(params, width, height, DEVICE, min_dim, x_grid, y_grid)
                 mse_loss = torch.mean((rendered - target_image) ** 2)
 

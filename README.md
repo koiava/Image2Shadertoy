@@ -6,6 +6,11 @@
 
 This tool is ideal for artists, developers, and researchers interested in procedural image rendering, shader programming, or Gaussian splatting techniques.
 
+### Example
+| Input: `neo.png` | Output: `result.png` |
+|------------------|----------------------|
+| ![Input](neo.png) | ![Output](result.png) |
+
 ---
 
 ## Features
@@ -39,10 +44,4 @@ This tool is ideal for artists, developers, and researchers interested in proced
 ```
 - Check that `result.png` and `result.shadertoy` are generated correctly.
 - Upload `result.shadertoy` to [Shadertoy](https://www.shadertoy.com/new) to verify it renders `neo.png` accurately.
-
-### Example
-| Input: `neo.png` | Output: `result.png` |
-|------------------|----------------------|
-| ![Input](neo.png) | ![Output](result.png) |
-
 - Here you can see the example running on a [shadertoy](https://www.shadertoy.com/view/wXBSWD).

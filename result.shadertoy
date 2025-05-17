@@ -1,5 +1,3 @@
-
-#version 300 es
 #define NUM_GAUSSIANS 278
 const uvec3 gaussian_data[NUM_GAUSSIANS] = uvec3[](
     uvec3(2234070583u, 2171214072u, 310530716u),
